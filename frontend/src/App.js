@@ -1,0 +1,244 @@
+import React, { useEffect, useRef, useState } from 'react';
+import * as ort from "onnxruntime-web";
+
+export default function App() {
+  const canvasRef = useRef(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [prediction, setPrediction] = useState(null);
+  const [confidence, setConfidence] = useState(null);
+  const [session, setSession] = useState(null);
+  const [allScores, setAllScores] = useState(null);
+
+  useEffect(() => {
+    ort.InferenceSession.create("/digit_model.onnx").then((s) => {
+      setSession(s);
+      console.log("Model loaded!");
+    })
+  }, []);
+
+  const getPos = (e, cavnas) => {
+    const rect = canvasRef.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top,
+    };
+  };
+
+  const startDrawing = (e) => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const pos = getPos(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    setIsDrawing(true);
+  };
+
+  const draw = (e) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const pos = getPos(e, canvas);
+    ctx.lineWidth = 18;
+    ctx.lineCap = "round";
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+    predict();
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    setPrediction(null);
+    setConfidence(null);
+    setAllScores([]);
+  };
+
+  const predict = async () => {
+    if (!session) return;
+
+    const canvas = canvasRef.current;
+
+    const small = document.createElement("canvas");
+    small.width = 28;
+    small.height = 28;
+    const smallCtx = small.getContext("2d");
+
+    smallCtx.drawImage(canvas, 0, 0, 28, 28);
+
+    const imageData = smallCtx.getImageData(0, 0, 28, 28);
+    const data = imageData.data;
+
+    const input = new Float32Array(28 * 28);
+    for (let i = 0; i < 28 * 28; i++) {
+      const r = data[i * 4];
+      const gray = r / 255;
+      input[i] = (gray - 0.1307) / 0.3081;
+    }
+
+    const tensor = new ort.Tensor("float32", input, [1, 1, 28, 28]);
+    const results = await session.run({ input: tensor });
+    const output = results.output.data;
+
+    const expScores = Array.from(output).map(Math.exp);
+    const sumExp = expScores.reduce((a, b) => a + b, 0);
+    const probs = expScores.map((e) => e / sumExp);
+
+    const maxProb = Math.max(...probs);
+    const digit = probs.indexOf(maxProb);
+
+    setPrediction(digit);
+    setConfidence((maxProb * 100).toFixed(1));
+    setAllScores(probs);
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }, []);
+
+  return (
+    <div style={StyleSheet.container}>
+      <h1 style={StyleSheet.title}>Digit Classifier</h1>
+      <p style={StyleSheet.subtitle}>Draw a digit (0-9) and the neural network will predict it</p>
+
+      <canvas
+        ref={canvasRef}
+        width={280}
+        height={280}
+        style={style.canvas}
+        onMouseDown={startDrawing}
+        onMouseMove={draw}
+        onMouseUp={stopDrawing}
+        onMouseLeave={stopDrawing}
+        onTouchStart={startDrawing}
+        onTouchMove={draw}
+        onTouchEnd={stopDrawing}
+      />
+
+      <button onClick={clearCanvas} style={StyleSheet.button}>
+        Clear
+      </button>
+
+      {prediction !== null && (
+        <div style={styles.result}>
+          <div style={styles.digit}>{prediction}</div>
+          <div style={styles.confidence}>Confidence: {confidence}</div>
+        </div>
+      )}
+
+      {allScores.length > 0 && (
+        <div style={styles.bars}>
+          {allScores.map((score, i) => (
+            <div key={i} style={styles.barRow}>
+              <span style={styles.barLabel}>{i}</span>
+              <div style={styles.barTrack}>
+                <div
+                  style={{
+                    ...styles.barFill,
+                    width: `${(score * 100).toFixed(1)}%`,
+                    background: i === prediction ? "#4ade80" : "#3b82f6",
+                  }}
+                />
+              </div>
+              <span style={styles.barPct}>{(score * 100).toFixed(1)}%</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const styles = {
+  container: {
+    minHeight: "100vh",
+    background: "#111",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    padding: "40px 20px",
+    fontFamily: "monospace",
+    color: "white",
+  },
+  title: {
+    fontSize: "2rem",
+    marginBottom: "8px",
+  },
+  subtitle: {
+    color: "#888",
+    marginBottom: "24px",
+    fontSize: "0.9rem",
+  },
+  canvas: {
+    border: "2px solid #444",
+    borderRadius: "8px",
+    cursor: "crosshair",
+  },
+  button: {
+    marginTop: "16px",
+    padding: "10px 32px",
+    background: "#222",
+    color: "white",
+    border: "1px solid #444",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontFamily: "monospace",
+    fontSize: "1rem",
+  },
+  result: {
+    marginTop: "24px",
+    textAlign: "center",
+  },
+  digit: {
+    fontSize: "5rem",
+    fontWeight: "bold",
+    color: "#4ade80",
+    lineHeight: 1,
+  },
+  confidence: {
+    color: "#888",
+    marginTop: "8px",
+  },
+  bars: {
+    marginTop: "24px",
+    width: "320px",
+  },
+  barRow: {
+    display: "flex",
+    alignItems: "center",
+    marginBottom: "6px",
+    gap: "8px",
+  },
+  barLabel: {
+    width: "12px",
+    textAlign: "right",
+    fontSize: "0.85rem",
+  },
+  barTrack: {
+    flex: 1,
+    background: "#222",
+    borderRadius: "4px",
+    height: "18px",
+    overflow: "hidden",
+  },
+  barFill: {
+    height: "100%",
+    borderRadius: "4px",
+    transition: "width 0.3s ease",
+  },
+  barPct: {
+    width: "42px",
+    fontSize: "0.75rem",
+    color: "#888",
+  },
+};
