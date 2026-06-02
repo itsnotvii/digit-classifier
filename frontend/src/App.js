@@ -10,14 +10,14 @@ export default function App() {
   const [allScores, setAllScores] = useState([]);
 
   useEffect(() => {
-    ort.InferenceSession.create("/digit_model.onnx").then((s) => {
+    ort.InferenceSession.create("/digit_model_single.onnx").then((s) => {
       setSession(s);
       console.log("Model loaded!");
-    })
+    });
   }, []);
 
   const getPos = (e, canvas) => {
-    const rect = canvasRef.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();  // fixed: was canvasRef
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     return {
@@ -27,7 +27,7 @@ export default function App() {
   };
 
   const startDrawing = (e) => {
-    const canvas = canvas.current;
+    const canvas = canvasRef.current;  // fixed: was canvas.current
     const ctx = canvas.getContext('2d');
     const pos = getPos(e, canvas);
     ctx.beginPath();
@@ -42,6 +42,7 @@ export default function App() {
     const pos = getPos(e, canvas);
     ctx.lineWidth = 18;
     ctx.lineCap = "round";
+    ctx.strokeStyle = "white";
     ctx.lineTo(pos.x, pos.y);
     ctx.stroke();
   };
@@ -63,37 +64,28 @@ export default function App() {
 
   const predict = async () => {
     if (!session) return;
-
     const canvas = canvasRef.current;
-
     const small = document.createElement("canvas");
     small.width = 28;
     small.height = 28;
     const smallCtx = small.getContext("2d");
-
     smallCtx.drawImage(canvas, 0, 0, 28, 28);
-
     const imageData = smallCtx.getImageData(0, 0, 28, 28);
     const data = imageData.data;
-
     const input = new Float32Array(28 * 28);
     for (let i = 0; i < 28 * 28; i++) {
       const r = data[i * 4];
       const gray = r / 255;
       input[i] = (gray - 0.1307) / 0.3081;
     }
-
     const tensor = new ort.Tensor("float32", input, [1, 1, 28, 28]);
     const results = await session.run({ input: tensor });
     const output = results.output.data;
-
     const expScores = Array.from(output).map(Math.exp);
     const sumExp = expScores.reduce((a, b) => a + b, 0);
     const probs = expScores.map((e) => e / sumExp);
-
     const maxProb = Math.max(...probs);
     const digit = probs.indexOf(maxProb);
-
     setPrediction(digit);
     setConfidence((maxProb * 100).toFixed(1));
     setAllScores(probs);
@@ -107,9 +99,9 @@ export default function App() {
   }, []);
 
   return (
-    <div style={StyleSheet.container}>
-      <h1 style={StyleSheet.title}>Digit Classifier</h1>
-      <p style={StyleSheet.subtitle}>Draw a digit (0-9) and the neural network will predict it</p>
+    <div style={styles.container}>  
+      <h1 style={styles.title}>Digit Classifier</h1>
+      <p style={styles.subtitle}>Draw a digit (0-9) and the neural network will predict it</p>
 
       <canvas
         ref={canvasRef}
@@ -125,14 +117,14 @@ export default function App() {
         onTouchEnd={stopDrawing}
       />
 
-      <button onClick={clearCanvas} style={StyleSheet.button}>
+      <button onClick={clearCanvas} style={styles.button}>
         Clear
       </button>
 
       {prediction !== null && (
         <div style={styles.result}>
           <div style={styles.digit}>{prediction}</div>
-          <div style={styles.confidence}>Confidence: {confidence}</div>
+          <div style={styles.confidence}>Confidence: {confidence}%</div>
         </div>
       )}
 
