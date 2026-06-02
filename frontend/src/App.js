@@ -159,6 +159,16 @@ export default function App() {
         onTouchEnd={stopDrawing}
       />
 
+      <div style={styles.previewContainer}>
+        <p style={styles.previewLabel}>What the model sees:</p>
+        <canvas
+          ref={previewRef}
+          width={84}
+          height={84}
+          style={styles.previewCanvas}
+        />
+      </div>
+
       <button onClick={clearCanvas} style={styles.button}>
         Clear
       </button>
