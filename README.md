@@ -16,6 +16,9 @@ Draw any digit (0–9) on the canvas and the neural network predicts it in real 
 4. The **neural network runs entirely in the browser** (no server, no API call)
 5. You see the **prediction and confidence scores** instantly
 
+   <img width="350" height="547" alt="Screenshot 2026-06-02 at 2 52 57 PM" src="https://github.com/user-attachments/assets/168833dc-216a-4899-b1be-0d5601700925" />
+
+
 ---
 
 ## Tech Stack
