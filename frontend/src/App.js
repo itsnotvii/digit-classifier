@@ -66,71 +66,78 @@ export default function App() {
 
   const predict = async () => {
     if (!session) return;
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext("2d");
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
 
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
+    // ── Find the bounding box of the drawing ──────────────────────
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
 
-      let minX = canvas.witdht, maxX = 0, minY = canvas.height, maxY = 0;
-      for (let y = 0; y < canvas.height; y++) {
-        for (let x = 0; x < canvas.width; x++) {
-          const i = (y * canvas.width + x) * 4;
-          if (data[i] > 20) {
-            if (x < minX) minX = x;
-            if (x > maxX) maxX = x;
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
-          }
+    let minX = canvas.width, maxX = 0, minY = canvas.height, maxY = 0;
+    for (let y = 0; y < canvas.height; y++) {
+      for (let x = 0; x < canvas.width; x++) {
+        const i = (y * canvas.width + x) * 4;
+        if (data[i] > 20) { // if pixel is bright (part of drawing)
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
         }
       }
+    }
 
-      if (maxX < minX) return;
+    // ── If nothing drawn, bail out ────────────────────────────────
+    if (maxX < minX) return;
 
-      const padding = 20;
-      minX = Math.max(0, minX - padding);
-      minY = Math.max(0, minY - padding);
-      maxX = Math.min(canvas.width, maxX + padding);
-      maxY = Math.min(canvas.height, maxY + padding);
+    // ── Add padding around the bounding box ──────────────────────
+    const padding = 20;
+    minX = Math.max(0, minX - padding);
+    minY = Math.max(0, minY - padding);
+    maxX = Math.min(canvas.width, maxX + padding);
+    maxY = Math.min(canvas.height, maxY + padding);
 
-      const small = document.createElement("canvas");
-      small.width = 28;
-      small.height = 28;
-      const smallCtx = small.getContext("2d");
-      smallCtx.fillStyle = "black";
-      smallCtx.fillRect(0, 0, 28, 28);
-      smallCtx.drawImage(
-        canvas,
-        minX, minY, maxX - minX, maxY - minY,
-        0, 0, 28, 28
-      );
+    // ── Crop and resize to 28x28 ──────────────────────────────────
+    const small = document.createElement("canvas");
+    small.width = 28;
+    small.height = 28;
+    const smallCtx = small.getContext("2d");
+    smallCtx.fillStyle = "black";
+    smallCtx.fillRect(0, 0, 28, 28);
+    smallCtx.drawImage(
+      canvas,
+      minX, minY, maxX - minX, maxY - minY, // source: cropped region
+      0, 0, 28, 28                           // destination: full 28x28
+    );
 
-      const preview = previewRef.current;
-      if (preview) {
-        const previewCtx = preview.getContext("2d");
-        previewCtx.drawImage(small, 0, 0, preview.width, preview.height);
-      }
+    // ── Show the 28x28 preview ────────────────────────────────────
+    const preview = previewRef.current;
+    if (preview) {
+      const previewCtx = preview.getContext("2d");
+      previewCtx.drawImage(small, 0, 0, preview.width, preview.height);
+    }
 
-      const smallData = smallCtx.getImageData(0, 0, 28, 28).data;
-      const input = new Float32Array(28 * 28);
-      for (let i = 0; i < 28 * 28; i++) {
-        const gray = smallData[i * 4] / 255;
-        input[i] = (gray - 0.1307) / 0.3081;
-      }
+    // ── Convert to model input ────────────────────────────────────
+    const smallData = smallCtx.getImageData(0, 0, 28, 28).data;
+    const input = new Float32Array(28 * 28);
+    for (let i = 0; i < 28 * 28; i++) {
+      const gray = smallData[i * 4] / 255;
+      input[i] = (gray - 0.1307) / 0.3081;
+    }
 
-      const tensor = new ort.Tensor("float32", input, [1, 1, 28, 28]);
-      const results = await session.run({ input: tensor });
-      const output = results.output.data;
+    // ── Run the model ─────────────────────────────────────────────
+    const tensor = new ort.Tensor("float32", input, [1, 1, 28, 28]);
+    const results = await session.run({ input: tensor });
+    const output = results.output.data;
 
-      const expScores = Array.from(output).map(Math.exp);
-      const sumExp = expScores.reduce((a, b) => a + b, 0);
-      const probs = expScores.map((e) => e / sumExp);
-      const maxProb = Math.max(...probs);
-      const digit = probs.indexOf(maxProb);
+    const expScores = Array.from(output).map(Math.exp);
+    const sumExp = expScores.reduce((a, b) => a + b, 0);
+    const probs = expScores.map((e) => e / sumExp);
+    const maxProb = Math.max(...probs);
+    const digit = probs.indexOf(maxProb);
 
-      setPrediction(digit);
-      setConfidence((maxProb * 100).toFixed(1));
-      setAllScores(probs);
+    setPrediction(digit);
+    setConfidence((maxProb * 100).toFixed(1));
+    setAllScores(probs);
   };
 
   useEffect(() => {
@@ -285,4 +292,19 @@ const styles = {
     fontSize: "0.75rem",
     color: "#888",
   },
+  previewContainer: {
+    marginTop: "16px",
+    textAlign: "center",
+  },
+  previewLabel: {
+    color: "#888",
+    fontSize: "0.75rem",
+    marginBottom: "6px",
+  },
+  previewCanvas: {
+    border: "1px solid #333",
+    borderRadius: "4px",
+    imageRendering: "pixelated",
+  },
+  
 };
