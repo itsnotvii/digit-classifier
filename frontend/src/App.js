@@ -3,13 +3,13 @@ import * as ort from "onnxruntime-web";
 
 export default function App() {
   const canvasRef = useRef(null);
+  const previewRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [prediction, setPrediction] = useState(null);
   const [confidence, setConfidence] = useState(null);
   const [session, setSession] = useState(null);
   const [allScores, setAllScores] = useState([]);
-  const canvasRef = useRef(null);
-  const previewRef = useRef(null);
+  
 
   useEffect(() => {
     ort.InferenceSession.create("/digit_model_single.onnx").then((s) => {
