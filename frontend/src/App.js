@@ -8,6 +8,8 @@ export default function App() {
   const [confidence, setConfidence] = useState(null);
   const [session, setSession] = useState(null);
   const [allScores, setAllScores] = useState([]);
+  const canvasRef = useRef(null);
+  const previewRef = useRef(null);
 
   useEffect(() => {
     ort.InferenceSession.create("/digit_model_single.onnx").then((s) => {
@@ -64,31 +66,71 @@ export default function App() {
 
   const predict = async () => {
     if (!session) return;
-    const canvas = canvasRef.current;
-    const small = document.createElement("canvas");
-    small.width = 28;
-    small.height = 28;
-    const smallCtx = small.getContext("2d");
-    smallCtx.drawImage(canvas, 0, 0, 28, 28);
-    const imageData = smallCtx.getImageData(0, 0, 28, 28);
-    const data = imageData.data;
-    const input = new Float32Array(28 * 28);
-    for (let i = 0; i < 28 * 28; i++) {
-      const r = data[i * 4];
-      const gray = r / 255;
-      input[i] = (gray - 0.1307) / 0.3081;
-    }
-    const tensor = new ort.Tensor("float32", input, [1, 1, 28, 28]);
-    const results = await session.run({ input: tensor });
-    const output = results.output.data;
-    const expScores = Array.from(output).map(Math.exp);
-    const sumExp = expScores.reduce((a, b) => a + b, 0);
-    const probs = expScores.map((e) => e / sumExp);
-    const maxProb = Math.max(...probs);
-    const digit = probs.indexOf(maxProb);
-    setPrediction(digit);
-    setConfidence((maxProb * 100).toFixed(1));
-    setAllScores(probs);
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      let minX = canvas.witdht, maxX = 0, minY = canvas.height, maxY = 0;
+      for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < canvas.width; x++) {
+          const i = (y * canvas.width + x) * 4;
+          if (data[i] > 20) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+
+      if (maxX < minX) return;
+
+      const padding = 20;
+      minX = Math.max(0, minX - padding);
+      minY = Math.max(0, minY - padding);
+      maxX = Math.min(canvas.width, maxX + padding);
+      maxY = Math.min(canvas.height, maxY + padding);
+
+      const small = document.createElement("canvas");
+      small.width = 28;
+      small.height = 28;
+      const smallCtx = small.getContext("2d");
+      smallCtx.fillStyle = "black";
+      smallCtx.fillRect(0, 0, 28, 28);
+      smallCtx.drawImage(
+        canvas,
+        minX, minY, maxX - minX, maxY - minY,
+        0, 0, 28, 28
+      );
+
+      const preview = previewRef.current;
+      if (preview) {
+        const previewCtx = preview.getContext("2d");
+        previewCtx.drawImage(small, 0, 0, preview.width, preview.height);
+      }
+
+      const smallData = smallCtx.getImageData(0, 0, 28, 28).data;
+      const input = new Float32Array(28 * 28);
+      for (let i = 0; i < 28 * 28; i++) {
+        const gray = smallData[i * 4] / 255;
+        input[i] = (gray - 0.1307) / 0.3081;
+      }
+
+      const tensor = new ort.Tensor("float32", input, [1, 1, 28, 28]);
+      const results = await session.run({ input: tensor });
+      const output = results.output.data;
+
+      const expScores = Array.from(output).map(Math.exp);
+      const sumExp = expScores.reduce((a, b) => a + b, 0);
+      const probs = expScores.map((e) => e / sumExp);
+      const maxProb = Math.max(...probs);
+      const digit = probs.indexOf(maxProb);
+
+      setPrediction(digit);
+      setConfidence((maxProb * 100).toFixed(1));
+      setAllScores(probs);
   };
 
   useEffect(() => {
