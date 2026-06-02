@@ -7,7 +7,7 @@ export default function App() {
   const [prediction, setPrediction] = useState(null);
   const [confidence, setConfidence] = useState(null);
   const [session, setSession] = useState(null);
-  const [allScores, setAllScores] = useState(null);
+  const [allScores, setAllScores] = useState([]);
 
   useEffect(() => {
     ort.InferenceSession.create("/digit_model.onnx").then((s) => {
@@ -16,7 +16,7 @@ export default function App() {
     })
   }, []);
 
-  const getPos = (e, cavnas) => {
+  const getPos = (e, canvas) => {
     const rect = canvasRef.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -27,7 +27,7 @@ export default function App() {
   };
 
   const startDrawing = (e) => {
-    const canvas = canvasRef.current;
+    const canvas = canvas.current;
     const ctx = canvas.getContext('2d');
     const pos = getPos(e, canvas);
     ctx.beginPath();
@@ -115,7 +115,7 @@ export default function App() {
         ref={canvasRef}
         width={280}
         height={280}
-        style={style.canvas}
+        style={styles.canvas}
         onMouseDown={startDrawing}
         onMouseMove={draw}
         onMouseUp={stopDrawing}
