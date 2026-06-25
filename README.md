@@ -10,7 +10,7 @@ Draw any digit (0–9) on the canvas and the neural network predicts it in real 
 
 ## How it works
 
-1. **Draw** a digit on the canvas
+1. **Draw** a digit on the canvas by hand
 2. The drawing is **cropped and centered** automatically to match the training data format
 3. It's **scaled down to 28×28 pixels** and normalized
 4. The **neural network runs entirely in the browser** (no server, no API call)
