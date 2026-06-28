@@ -1,6 +1,6 @@
 # Digit Classifier
 
-A scratch handwritten digit classifier built end-to-end — from training a neural network from scratch to deploying it as an interactive web app.
+A handwritten digit classifier built end-to-end — from training a neural network from scratch to deploying it as an interactive web app.
 
 **[Try it live →](https://digit-classifier-ten.vercel.app)**
 
