@@ -4,7 +4,7 @@ A handwritten digit classifier built end-to-end — from training a neural netwo
 
 **[Try it live →](https://digit-classifier-ten.vercel.app)**
 
-Draw any digit (0–9) on the canvas and the neural network predicts it in real time, with confidence scores for every digit.
+Draw any digit (0–9) on the canvas and the neural network predicts it in real time, with confidence scores for every digit drawn. 
 
 ---
 
