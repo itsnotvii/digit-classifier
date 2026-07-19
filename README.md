@@ -34,7 +34,7 @@ Draw any digit (0–9) on the canvas and the neural network predicts it in real 
 
 ---
 
-## Model Architecture
+## The Model Architecture
 
 A Convolutional Neural Network (CNN) trained from scratch on the MNIST dataset.
 
